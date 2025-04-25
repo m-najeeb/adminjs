@@ -3,13 +3,14 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import AdminJS from 'adminjs';
 import path from 'path';
+import argon2 from 'argon2';
+import passwordsFeature from '@adminjs/passwords';
 import AdminJSExpress from '@adminjs/express';
 import { Database, Resource } from '@adminjs/mongoose';
-import uploadFeature from '@adminjs/upload';
 import { UserSchema } from './model/userModels.js';
 import { ProductSchema } from './model/productModels.js';
 import { fileURLToPath } from 'url';
-import { Components, componentLoader } from './components/components.js';
+import { Components, componentLoader } from './components/index.js';
 
 dotenv.config();
 
@@ -29,15 +30,14 @@ const createAdminJS = () => {
                 options: {
                     id: "Users",
                     navigation: {
-                        name: null,
-                        icon: "User"
+                        name: null, // Standalone item
+                        icon: "User",
                     },
                     properties: {
                         _id: {
                             isVisible: false,
                         },
                         user: {
-                            // position: 1,
                             isVisible: { list: true, edit: false, filter: false, show: false },
                             components: {
                                 list: Components.AvatarList,
@@ -52,11 +52,9 @@ const createAdminJS = () => {
                         },
                         name: {
                             isVisible: { list: false, edit: true, filter: true, show: true },
-                            // position: 2,
                         },
                         email: {
                             isVisible: { list: false, edit: true, filter: true, show: true },
-                            // position: 3,
                         },
                         password: {
                             isVisible: { list: false, edit: true, filter: false, show: false },
@@ -64,53 +62,53 @@ const createAdminJS = () => {
                     },
                     listProperties: ['user', 'phone'],
                 },
-                // features: [
-                //     uploadFeature({
-                //         componentLoader,
-                //         provider: {
-                //             local: {
-                //                 bucket: path.join(__dirname, 'public/avatars'),
-                //                 opts: {
-                //                     baseUrl: '/avatars',
-                //                 },
-                //             },
-                //         },
-                //         properties: {
-                //             key: 'avatar', // Store file path in avatar field
-                //         },
-                //         validation: {
-                //             mimeTypes: ['image/png', 'image/jpeg', 'image/gif'],
-                //             maxSize: 1048576, // 1MB
-                //         },
-                //     }),
-                // ],
+                features: [
+                    passwordsFeature({
+                        componentLoader,
+                        properties: {
+                            encryptedPassword: 'password',
+                            password: 'password',
+                        },
+                        hash: argon2.hash,
+                    }),
+                ],
             },
             {
                 resource: ProductSchema,
                 options: {
                     id: "Products",
                     navigation: {
-                        name: null,
-                        icon: "ShoppingCart"
+                        name: null, // Standalone item
+                        icon: "ShoppingCart",
                     },
                     properties: {
                         _id: {
                             isVisible: false,
                         },
-                    }
+                    },
                 },
-            }
+            },
         ],
+        // pages: {
+        //     'Dashboard': {
+        //         component: Components.HomeDashboard,
+        //         navigation: {
+        //             name: null, // Standalone item
+        //             icon: 'Grid',
+        //         },
+        //         href: ({ h }) => {
+        //             return '/admin';
+        //         },
+        //     },
+        // },
         branding: {
             companyName: 'Assort Tech',
             logo: '/logo.png',
             withMadeWithLove: false,
-
         },
-        // rootPath: '/admin',
-        // components: {
-        //     Sidebar: Components.Sidebar,
-        // },
+        assets: {
+            styles: ['/custom.css'],
+        },
         dashboard: {
             component: Components.HomeDashboard,
         },
@@ -128,6 +126,7 @@ const startServer = async () => {
         app.use(express.static(path.join(__dirname, 'public')));
 
         const admin = createAdminJS();
+        await admin.watch();
         const adminRouter = AdminJSExpress.buildRouter(admin);
 
         app.use(admin.options.rootPath, adminRouter);
